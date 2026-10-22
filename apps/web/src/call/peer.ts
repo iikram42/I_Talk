@@ -27,7 +27,7 @@ interface Options {
   iceServers: IceServerConfig[];
   /**
    * The host always makes offers and the guest only answers, which avoids offer collisions.
-   * The host waits for the guest's `peer-ready` before offering (see useCall).
+   * The guest sends `peer-ready` for each new connection so the host can offer again (see useCall).
    */
   isOfferer: boolean;
   callType: CallType;

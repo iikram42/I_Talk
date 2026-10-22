@@ -98,8 +98,6 @@ export function useCall(
   const translationEnabledRef = useRef(true);
   /** Bumped whenever the peer connection must be rebuilt (presence changes, our own reconnect). */
   const [peerGeneration, setPeerGeneration] = useState(0);
-  /** Host only: the guest asked for an offer that has not been sent yet. */
-  const offerRequestedRef = useRef(false);
 
   // Audio graph: one context for both mic capture and translated speech output.
   useEffect(() => {
@@ -130,7 +128,6 @@ export function useCall(
       case 'room-update':
         setRoom(msg.room);
         setParticipants(msg.participants);
-        if (msg.type === 'ready') setPeerGeneration((g) => g + 1);
         break;
       case 'room-ended':
         setEndedReason(msg.reason);
@@ -155,7 +152,6 @@ export function useCall(
         break;
       case 'peer-ready':
         // The guest built a fresh connection: start over with a new one and offer to it.
-        offerRequestedRef.current = true;
         setPeerGeneration((g) => g + 1);
         break;
       case 'peer-playback':
@@ -234,12 +230,10 @@ export function useCall(
       onQuality: setQuality,
     });
     peerRef.current = call;
-    if (isHost && offerRequestedRef.current) {
-      offerRequestedRef.current = false;
-      call.offer();
-    } else if (!isHost) {
-      socketRef.current?.send({ type: 'peer-ready' });
-    }
+    // The host offers to every new connection. If the guest had no connection yet, it asks
+    // again with `peer-ready` once it does; offers to a replaced connection are ignored by id.
+    if (isHost) call.offer();
+    else socketRef.current?.send({ type: 'peer-ready' });
     setConnectionState('new');
     return () => {
       call.close();
