@@ -4,7 +4,9 @@ import { E2E_DATABASE_URL } from '../playwright.config';
 
 async function createRoom(page: Page, type: 'voice' | 'video'): Promise<string> {
   await page.goto('/');
-  await page.getByRole('button', { name: type === 'voice' ? 'Start a Voice Call' : 'Start a Video Call' }).click();
+  await page
+    .getByRole('button', { name: type === 'voice' ? 'Start a Voice Call' : 'Start a Video Call' })
+    .click();
   await expect(page.getByRole('heading', { name: 'Create a room' })).toBeVisible();
   await expect(page.getByLabel('I speak')).toHaveValue(/Hindi/);
   await expect(page.getByLabel('They speak')).toHaveValue(/Indonesian/);
@@ -23,7 +25,9 @@ async function joinAsGuest(browser: Browser, url: string, name = 'Budi'): Promis
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto(url);
-  await expect(page.getByRole('heading', { name: /Asha invited you to a (voice|video) call/ })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /Asha invited you to a (voice|video) call/ }),
+  ).toBeVisible();
   // The secret is removed from the address bar once read.
   expect(page.url()).not.toContain('#');
   await page.getByLabel('Your name').fill(name);
@@ -57,7 +61,10 @@ async function peakLevel(page: Page, label: string): Promise<number> {
 }
 
 for (const type of ['voice', 'video'] as const) {
-  test(`${type} call: create, invite, join, translate, mute, end`, async ({ page: host, browser }) => {
+  test(`${type} call: create, invite, join, translate, mute, end`, async ({
+    page: host,
+    browser,
+  }) => {
     const url = await createRoom(host, type);
     await expect(host.getByText('Waiting for guest')).toBeVisible();
     const guest = await joinAsGuest(browser, url);
@@ -72,13 +79,21 @@ for (const type of ['voice', 'video'] as const) {
     expect(await peakLevel(guest, "Other person's voice")).toBeGreaterThan(0.01);
     if (type === 'video') {
       await expect
-        .poll(() => guest.evaluate(() => Math.max(...[...document.querySelectorAll('video')].map((v) => v.videoWidth))))
+        .poll(() =>
+          guest.evaluate(() =>
+            Math.max(...[...document.querySelectorAll('video')].map((v) => v.videoWidth)),
+          ),
+        )
         .toBeGreaterThan(0);
     }
 
     // Both directions are recognized, translated and shown to both people.
-    await expect(guest.getByText('[id] test utterance', { exact: false }).first()).toBeVisible({ timeout: 20_000 });
-    await expect(host.getByText('[hi] test utterance', { exact: false }).first()).toBeVisible({ timeout: 20_000 });
+    await expect(guest.getByText('[id] test utterance', { exact: false }).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(host.getByText('[hi] test utterance', { exact: false }).first()).toBeVisible({
+      timeout: 20_000,
+    });
     await expect(host.getByText(/in hi-IN$/).first()).toBeVisible();
 
     // Synthesized speech arrives on the dedicated translation track, not the voice track.
@@ -131,7 +146,9 @@ test('invalid, revoked and expired invitations fail safely', async ({ page, brow
   const roomId = new URL(url2).pathname.split('/').pop()!;
   const db = new pg.Client({ connectionString: E2E_DATABASE_URL });
   await db.connect();
-  await db.query(`UPDATE rooms SET expires_at = now() - interval '1 minute' WHERE id = $1`, [roomId]);
+  await db.query(`UPDATE rooms SET expires_at = now() - interval '1 minute' WHERE id = $1`, [
+    roomId,
+  ]);
   await db.end();
   const guest2 = await (await browser.newContext()).newPage();
   await guest2.goto(url2);
@@ -140,7 +157,9 @@ test('invalid, revoked and expired invitations fail safely', async ({ page, brow
   // Someone with only the room URL (no token) is not let in.
   const outsider = await (await browser.newContext()).newPage();
   await outsider.goto(`/room/${roomId}`);
-  await expect(outsider.getByRole('heading', { name: 'You’re not part of this call' })).toBeVisible();
+  await expect(
+    outsider.getByRole('heading', { name: 'You’re not part of this call' }),
+  ).toBeVisible();
 });
 
 test('host can cancel a room before anyone joins', async ({ page }) => {
@@ -148,4 +167,20 @@ test('host can cancel a room before anyone joins', async ({ page }) => {
   await page.getByRole('button', { name: 'Cancel call' }).click();
   await expect(page.getByRole('heading', { name: 'Call ended' })).toBeVisible();
   await expect(page.getByText('The host cancelled this call')).toBeVisible();
+});
+
+test('participants who reload rejoin and media reconnects', async ({ page: host, browser }) => {
+  const url = await createRoom(host, 'voice');
+  const guest = await joinAsGuest(browser, url);
+  await expect(guest.getByText(connected).first()).toBeVisible({ timeout: 30_000 });
+  await guest.reload();
+  await expect(guest.getByText(connected).first()).toBeVisible({ timeout: 30_000 });
+  await expect(host.getByText(connected).first()).toBeVisible({ timeout: 30_000 });
+  expect(await peakLevel(host, "Other person's voice")).toBeGreaterThan(0.01);
+  await host.reload();
+  await expect(host.getByText(connected).first()).toBeVisible({ timeout: 30_000 });
+  await expect(guest.getByText(connected).first()).toBeVisible({ timeout: 30_000 });
+  expect(await peakLevel(guest, "Other person's voice")).toBeGreaterThan(0.01);
+  await host.getByRole('button', { name: 'End call' }).click();
+  await expect(guest.getByRole('heading', { name: 'Call ended' })).toBeVisible();
 });

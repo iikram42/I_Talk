@@ -33,18 +33,23 @@ export function LanguageSelect({ id, value, onChange, options, ...aria }: Props)
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
-    return options.filter((o) => [o.name, o.nativeName, o.code].some((s) => s.toLowerCase().includes(q)));
+    return options.filter((o) =>
+      [o.name, o.nativeName, o.code].some((s) => s.toLowerCase().includes(q)),
+    );
   }, [options, query]);
 
   useEffect(() => {
-    if (!open) return;
-    const index = filtered.findIndex((o) => o.code === value);
-    setActive(index >= 0 ? index : 0);
-  }, [open, filtered, value]);
-
-  useEffect(() => {
-    listRef.current?.querySelector<HTMLElement>(`[data-index="${active}"]`)?.scrollIntoView?.({ block: 'nearest' });
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${active}"]`)
+      ?.scrollIntoView?.({ block: 'nearest' });
   }, [active]);
+
+  function openList() {
+    if (open) return;
+    const index = options.findIndex((o) => o.code === value);
+    setActive(index >= 0 ? index : 0);
+    setOpen(true);
+  }
 
   function choose(option: LanguageOption | undefined) {
     if (!option || !option.available) return;
@@ -56,7 +61,7 @@ export function LanguageSelect({ id, value, onChange, options, ...aria }: Props)
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
-      if (!open) return setOpen(true);
+      if (!open) return openList();
       const step = e.key === 'ArrowDown' ? 1 : -1;
       setActive((i) => (filtered.length ? (i + step + filtered.length) % filtered.length : 0));
     } else if (e.key === 'Enter') {
@@ -79,17 +84,20 @@ export function LanguageSelect({ id, value, onChange, options, ...aria }: Props)
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={open && filtered[active] ? `${listId}-${filtered[active].code}` : undefined}
+        aria-activedescendant={
+          open && filtered[active] ? `${listId}-${filtered[active].code}` : undefined
+        }
         autoComplete="off"
         className={`${inputClass} pr-9`}
         value={open ? query : selected ? label(selected) : ''}
         placeholder={open && selected ? label(selected) : 'Search languages'}
         onChange={(e) => {
           setQuery(e.target.value);
+          setActive(0);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
+        onFocus={openList}
+        onClick={openList}
         onBlur={() => {
           setOpen(false);
           setQuery('');
@@ -97,8 +105,19 @@ export function LanguageSelect({ id, value, onChange, options, ...aria }: Props)
         onKeyDown={onKeyDown}
         {...aria}
       />
-      <svg className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path d="M5.5 7.5 10 12l4.5-4.5" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      <svg
+        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path
+          d="M5.5 7.5 10 12l4.5-4.5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinecap="round"
+        />
       </svg>
       {open && (
         <ul
@@ -108,7 +127,9 @@ export function LanguageSelect({ id, value, onChange, options, ...aria }: Props)
           aria-label="Languages"
           className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-surface py-1 shadow-lg"
         >
-          {filtered.length === 0 && <li className="px-3 py-2 text-sm text-muted">No matching languages</li>}
+          {filtered.length === 0 && (
+            <li className="px-3 py-2 text-sm text-muted">No matching languages</li>
+          )}
           {filtered.map((o, i) => (
             <li
               key={o.code}

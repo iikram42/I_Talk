@@ -12,7 +12,9 @@ export async function migrate(db: Db, dir = defaultDir): Promise<string[]> {
   );
   const files = (await readdir(dir)).filter((f) => /^\d+_.+\.sql$/.test(f)).sort();
   const applied = new Set(
-    (await db.query<{ name: string }>('SELECT name FROM schema_migrations')).rows.map((r) => r.name),
+    (await db.query<{ name: string }>('SELECT name FROM schema_migrations')).rows.map(
+      (r) => r.name,
+    ),
   );
   const ran: string[] = [];
   for (const file of files) {

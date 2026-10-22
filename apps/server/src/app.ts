@@ -49,7 +49,9 @@ export async function buildApp({ config, db, providers, logger = true }: AppOpti
     bodyLimit: 16 * 1024,
     genReqId: (req) => {
       const incoming = req.headers['x-request-id'];
-      return typeof incoming === 'string' && /^[\w-]{8,64}$/.test(incoming) ? incoming : randomUUID();
+      return typeof incoming === 'string' && /^[\w-]{8,64}$/.test(incoming)
+        ? incoming
+        : randomUUID();
     },
   });
 
@@ -60,14 +62,19 @@ export async function buildApp({ config, db, providers, logger = true }: AppOpti
     presence: hub,
     isLanguageAvailable: (code) => translation.supports(code),
     onRoomChanged: (roomId) => {
-      hub.publishRoom(roomId).catch((err: Error) => server.log.error({ err: err.message, roomId }, 'publish failed'));
+      hub
+        .publishRoom(roomId)
+        .catch((err: Error) => server.log.error({ err: err.message, roomId }, 'publish failed'));
     },
   });
   hub.attach(rooms);
 
   server.addHook('onSend', async (req, reply) => {
     reply.header('x-request-id', req.id);
-    reply.header('permissions-policy', 'camera=(self), microphone=(self), geolocation=(), payment=()');
+    reply.header(
+      'permissions-policy',
+      'camera=(self), microphone=(self), geolocation=(), payment=()',
+    );
     if (req.url.startsWith('/api/')) reply.header('cache-control', 'no-store');
   });
 
@@ -97,7 +104,9 @@ export async function buildApp({ config, db, providers, logger = true }: AppOpti
 
   server.setErrorHandler((error: FastifyError | AppError | ZodError, req, reply) => {
     let status = 500;
-    let body: ApiErrorBody = { error: { code: 'internal', message: 'Something went wrong.', requestId: req.id } };
+    let body: ApiErrorBody = {
+      error: { code: 'internal', message: 'Something went wrong.', requestId: req.id },
+    };
     if (error instanceof AppError) {
       status = error.statusCode;
       body = { error: { code: error.code, message: error.message } };
@@ -105,10 +114,17 @@ export async function buildApp({ config, db, providers, logger = true }: AppOpti
       status = 400;
       const issue = error.issues[0];
       const where = issue?.path.length ? `${issue.path.join('.')}: ` : '';
-      body = { error: { code: 'bad_request', message: `${where}${issue?.message ?? 'Invalid request'}` } };
+      body = {
+        error: { code: 'bad_request', message: `${where}${issue?.message ?? 'Invalid request'}` },
+      };
     } else if ('statusCode' in error && error.statusCode === 429) {
       status = 429;
-      body = { error: { code: 'rate_limited', message: 'Too many requests. Please wait a moment and try again.' } };
+      body = {
+        error: {
+          code: 'rate_limited',
+          message: 'Too many requests. Please wait a moment and try again.',
+        },
+      };
     } else if ('statusCode' in error && error.statusCode && error.statusCode < 500) {
       status = error.statusCode;
       body = { error: { code: 'bad_request', message: 'Invalid request.' } };
@@ -134,20 +150,32 @@ export async function buildApp({ config, db, providers, logger = true }: AppOpti
   });
 
   server.get('/api/languages', async () => ({
-    languages: LANGUAGES.map((l) => ({ code: l.code, name: l.name, nativeName: l.nativeName, available: translation.supports(l.code) })),
+    languages: LANGUAGES.map((l) => ({
+      code: l.code,
+      name: l.name,
+      nativeName: l.nativeName,
+      available: translation.supports(l.code),
+    })),
     translation: translation.availability(),
   }));
 
   registerRoomRoutes(server, { config, rooms, translation });
 
-  server.get('/ws', { websocket: true }, (socket, req) => {
-    const origin = req.headers.origin;
-    if (!origin || !config.PUBLIC_ORIGINS.includes(origin)) {
-      socket.close(CLOSE_CODES.policy, 'Origin not allowed');
-      return;
-    }
-    hub.handle(socket);
-  });
+  server.get(
+    '/ws',
+    {
+      websocket: true,
+      config: { rateLimit: { max: config.RATE_LIMIT_JOIN_PER_MIN * 2, timeWindow: '1 minute' } },
+    },
+    (socket, req) => {
+      const origin = req.headers.origin;
+      if (!origin || !config.PUBLIC_ORIGINS.includes(origin)) {
+        socket.close(CLOSE_CODES.policy, 'Origin not allowed');
+        return;
+      }
+      hub.handle(socket);
+    },
+  );
 
   if (config.SERVE_WEB) {
     const root = path.resolve(process.cwd(), config.WEB_DIST_DIR);
@@ -167,7 +195,8 @@ export async function buildApp({ config, db, providers, logger = true }: AppOpti
     ];
     for (const id of ended) await hub.publishRoom(id);
     const purged = await purgeEndedRooms(db, config.ROOM_RETENTION_DAYS);
-    if (ended.length || purged) server.log.info({ ended: ended.length, purged }, 'room maintenance');
+    if (ended.length || purged)
+      server.log.info({ ended: ended.length, purged }, 'room maintenance');
   }
 
   server.addHook('onClose', async () => {

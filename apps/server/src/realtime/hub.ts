@@ -1,5 +1,10 @@
 import type { WebSocket } from 'ws';
-import { MAX_AUDIO_FRAME_BYTES, type ClientMessage, type ServerMessage, clientMessageSchema } from '@parley/shared';
+import {
+  MAX_AUDIO_FRAME_BYTES,
+  type ClientMessage,
+  type ServerMessage,
+  clientMessageSchema,
+} from '@parley/shared';
 import { AppError } from '../errors.js';
 import type { ParticipantRow } from '../rooms/repository.js';
 import type { Presence, RoomService } from '../rooms/service.js';
@@ -23,6 +28,7 @@ interface RoomState {
 }
 
 const MAX_MESSAGES_PER_SECOND = 60;
+const HEARTBEAT_MS = 30_000;
 /** Allows bursts after a network hiccup while rejecting sustained faster-than-real-time audio. */
 const MAX_AUDIO_BYTES_PER_SECOND = MAX_AUDIO_FRAME_BYTES * 3;
 export const CLOSE_CODES = {
@@ -66,7 +72,18 @@ export class RealtimeHub implements Presence {
   /** Handles a new socket: authenticates with the first message, then serves the session. */
   handle(socket: WebSocket): void {
     let conn: Connection | null = null;
-    const authTimer = setTimeout(() => socket.close(CLOSE_CODES.unauthorized, 'Authentication timeout'), 5_000);
+    const authTimer = setTimeout(
+      () => socket.close(CLOSE_CODES.unauthorized, 'Authentication timeout'),
+      5_000,
+    );
+    // Detect half-open connections (e.g. a laptop that went to sleep) so presence stays accurate.
+    let alive = true;
+    socket.on('pong', () => (alive = true));
+    const heartbeat = setInterval(() => {
+      if (!alive) return socket.terminate();
+      alive = false;
+      socket.ping();
+    }, HEARTBEAT_MS);
 
     socket.on('message', (data, isBinary) => {
       if (!conn) {
@@ -84,6 +101,7 @@ export class RealtimeHub implements Presence {
 
     socket.on('close', () => {
       clearTimeout(authTimer);
+      clearInterval(heartbeat);
       if (conn) void this.disconnect(conn);
     });
     socket.on('error', (err) => this.log.warn({ err: err.message }, 'websocket error'));
@@ -125,7 +143,11 @@ export class RealtimeHub implements Presence {
       return conn;
     } catch (err) {
       const message = err instanceof AppError ? err.message : 'Could not join the call.';
-      send(socket, { type: 'error', code: err instanceof AppError ? err.code : 'unauthorized', message });
+      send(socket, {
+        type: 'error',
+        code: err instanceof AppError ? err.code : 'unauthorized',
+        message,
+      });
       socket.close(CLOSE_CODES.unauthorized, 'Unauthorized');
       return null;
     }
@@ -142,7 +164,8 @@ export class RealtimeHub implements Presence {
     budget.count += 1;
     budget.audioBytes += audioBytes;
     if (budget.count > MAX_MESSAGES_PER_SECOND || budget.audioBytes > MAX_AUDIO_BYTES_PER_SECOND) {
-      if (budget.count > MAX_MESSAGES_PER_SECOND * 5) conn.socket.close(CLOSE_CODES.policy, 'Too many messages');
+      if (budget.count > MAX_MESSAGES_PER_SECOND * 5)
+        conn.socket.close(CLOSE_CODES.policy, 'Too many messages');
       return false;
     }
     return true;
@@ -163,22 +186,43 @@ export class RealtimeHub implements Presence {
     }
     const state = this.rooms.get(conn.roomId);
     if (!state) return;
-    const peer = [...state.connections.values()].find((c) => c.participant.id !== conn.participant.id);
+    const peer = [...state.connections.values()].find(
+      (c) => c.participant.id !== conn.participant.id,
+    );
 
     switch (msg.type) {
       case 'signal':
-        if (peer) send(peer.socket, { type: 'signal', description: msg.description, candidate: msg.candidate });
+        if (peer)
+          send(peer.socket, {
+            type: 'signal',
+            connectionId: msg.connectionId,
+            description: msg.description,
+            candidate: msg.candidate,
+          });
         break;
       case 'media-state':
-        if (peer) send(peer.socket, { type: 'peer-media-state', micMuted: msg.micMuted, cameraOff: msg.cameraOff });
+        if (peer)
+          send(peer.socket, {
+            type: 'peer-media-state',
+            micMuted: msg.micMuted,
+            cameraOff: msg.cameraOff,
+          });
         break;
       case 'playback':
-        if (peer) send(peer.socket, { type: 'peer-playback', utteranceId: msg.utteranceId, state: msg.state });
+        if (peer)
+          send(peer.socket, {
+            type: 'peer-playback',
+            utteranceId: msg.utteranceId,
+            state: msg.state,
+          });
         break;
       case 'translation-control':
         if (msg.enabled) state.translationPaused.delete(conn.participant.id);
         else state.translationPaused.add(conn.participant.id);
         state.pipelines.get(conn.participant.id)?.setEnabled(msg.enabled);
+        break;
+      case 'peer-ready':
+        if (peer) send(peer.socket, { type: 'peer-ready' });
         break;
       case 'ping':
         send(conn.socket, { type: 'pong' });
@@ -218,7 +262,8 @@ export class RealtimeHub implements Presence {
     }
     const view = this.roomService.toRoomView(room);
     const people = participants.map((p) => this.roomService.toParticipantView(p));
-    for (const c of state.connections.values()) send(c.socket, { type: 'room-update', room: view, participants: people });
+    for (const c of state.connections.values())
+      send(c.socket, { type: 'room-update', room: view, participants: people });
     this.syncPipelines(roomId, participants);
   }
 
@@ -227,7 +272,8 @@ export class RealtimeHub implements Presence {
     const state = this.rooms.get(roomId);
     if (!state) return;
     const providers = this.translation.providers;
-    const bothConnected = participants.length === 2 && participants.every((p) => state.connections.has(p.id));
+    const bothConnected =
+      participants.length === 2 && participants.every((p) => state.connections.has(p.id));
     if (!bothConnected || !providers || !this.translation.ready) {
       if (bothConnected && !this.translation.ready) {
         const { reason } = this.translation.availability();
@@ -274,7 +320,12 @@ export class RealtimeHub implements Presence {
   private roomState(roomId: string): RoomState {
     let state = this.rooms.get(roomId);
     if (!state) {
-      state = { connections: new Map(), pipelines: new Map(), guard: new LoopGuard(), translationPaused: new Set() };
+      state = {
+        connections: new Map(),
+        pipelines: new Map(),
+        guard: new LoopGuard(),
+        translationPaused: new Set(),
+      };
       this.rooms.set(roomId, state);
     }
     return state;

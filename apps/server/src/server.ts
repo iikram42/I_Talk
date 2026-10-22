@@ -9,7 +9,9 @@ await migrate(db);
 const app = await buildApp({ config, db });
 
 const sweeper = setInterval(() => {
-  app.sweep().catch((err: Error) => app.server.log.error({ err: err.message }, 'room maintenance failed'));
+  app
+    .sweep()
+    .catch((err: Error) => app.server.log.error({ err: err.message }, 'room maintenance failed'));
 }, 60_000);
 
 let shuttingDown = false;

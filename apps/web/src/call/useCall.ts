@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import type { ParticipantView, RoomView, ServerMessage, SessionResponse, TranslationState } from '@parley/shared';
+import type {
+  ParticipantView,
+  RoomView,
+  ServerMessage,
+  SessionResponse,
+  TranslationState,
+} from '@parley/shared';
 import { MicStreamer } from './micStreamer';
 import { type ConnectionQuality, PeerCall, type RemoteMedia } from './peer';
 import { RoomSocket, type SocketStatus } from './signaling';
 import { TranslationPlayer } from './translationPlayer';
 import { transcriptReducer } from './transcripts';
 import type { LocalMedia } from './useLocalMedia';
+
+/** Enables or disables a media track (a muted track sends silence / black frames). */
+function setTrackEnabled(track: MediaStreamTrack | null, enabled: boolean) {
+  if (track) track.enabled = enabled;
+}
 
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
   const bin = atob(b64);
@@ -45,12 +56,19 @@ export interface CallControls {
   resumeAudio: () => void;
 }
 
-export function useCall(roomId: string, token: string, session: SessionResponse, media: LocalMedia): CallState & CallControls {
+export function useCall(
+  roomId: string,
+  token: string,
+  session: SessionResponse,
+  media: LocalMedia,
+): CallState & CallControls {
   const [socketStatus, setSocketStatus] = useState<SocketStatus>('connecting');
   const [closeCode, setCloseCode] = useState<number>();
   const [room, setRoom] = useState(session.room);
   const [participants, setParticipants] = useState(session.participants);
-  const [endedReason, setEndedReason] = useState<string | null>(session.room.status === 'ended' ? session.room.endReason ?? 'ended' : null);
+  const [endedReason, setEndedReason] = useState<string | null>(
+    session.room.status === 'ended' ? (session.room.endReason ?? 'ended') : null,
+  );
   const [connectionState, setConnectionState] = useState<CallState['connectionState']>('idle');
   const [quality, setQuality] = useState<ConnectionQuality>('unknown');
   const [remote, setRemote] = useState<RemoteMedia | null>(null);
@@ -71,11 +89,17 @@ export function useCall(roomId: string, token: string, session: SessionResponse,
 
   const socketRef = useRef<RoomSocket | null>(null);
   const peerRef = useRef<PeerCall | null>(null);
-  const audioRef = useRef<{ context: AudioContext; player: TranslationPlayer; mic: MicStreamer } | null>(null);
+  const audioRef = useRef<{
+    context: AudioContext;
+    player: TranslationPlayer;
+    mic: MicStreamer;
+  } | null>(null);
   const micMutedRef = useRef(false);
   const translationEnabledRef = useRef(true);
   /** Bumped whenever the peer connection must be rebuilt (presence changes, our own reconnect). */
   const [peerGeneration, setPeerGeneration] = useState(0);
+  /** Host only: the guest asked for an offer that has not been sent yet. */
+  const offerRequestedRef = useRef(false);
 
   // Audio graph: one context for both mic capture and translated speech output.
   useEffect(() => {
@@ -129,11 +153,22 @@ export function useCall(roomId: string, token: string, session: SessionResponse,
           receivedAt: performance.now(),
         });
         break;
+      case 'peer-ready':
+        // The guest built a fresh connection: start over with a new one and offer to it.
+        offerRequestedRef.current = true;
+        setPeerGeneration((g) => g + 1);
+        break;
       case 'peer-playback':
         setReceivingTranslation(msg.state === 'started');
         break;
       case 'translation-status':
-        setTranslationStatus((s) => ({ ...s, [msg.participantId]: { state: msg.state, ...(msg.message ? { message: msg.message } : {}) } }));
+        setTranslationStatus((s) => ({
+          ...s,
+          [msg.participantId]: {
+            state: msg.state,
+            ...(msg.message ? { message: msg.message } : {}),
+          },
+        }));
         break;
       case 'error':
       case 'pong':
@@ -199,6 +234,12 @@ export function useCall(roomId: string, token: string, session: SessionResponse,
       onQuality: setQuality,
     });
     peerRef.current = call;
+    if (isHost && offerRequestedRef.current) {
+      offerRequestedRef.current = false;
+      call.offer();
+    } else if (!isHost) {
+      socketRef.current?.send({ type: 'peer-ready' });
+    }
     setConnectionState('new');
     return () => {
       call.close();
@@ -208,7 +249,17 @@ export function useCall(roomId: string, token: string, session: SessionResponse,
       setQuality('unknown');
     };
     // peerGeneration intentionally forces a fresh connection.
-  }, [peerConnected, peerGeneration, media.mic, media.stream, media.video, endedReason, isHost, room.callType, session.iceServers]);
+  }, [
+    peerConnected,
+    peerGeneration,
+    media.mic,
+    media.stream,
+    media.video,
+    endedReason,
+    isHost,
+    room.callType,
+    session.iceServers,
+  ]);
 
   const sendMediaState = useCallback((muted: boolean, camOff: boolean) => {
     socketRef.current?.send({ type: 'media-state', micMuted: muted, cameraOff: camOff });
@@ -218,22 +269,15 @@ export function useCall(roomId: string, token: string, session: SessionResponse,
     if (socketStatus === 'open') sendMediaState(micMuted, cameraOff);
   }, [socketStatus, peerConnected, micMuted, cameraOff, sendMediaState]);
 
-  const setMicMuted = useCallback(
-    (muted: boolean) => {
-      micMutedRef.current = muted;
-      if (media.mic) media.mic.enabled = !muted;
-      setMicMutedState(muted);
-    },
-    [media.mic],
-  );
+  // Apply mute and camera state to the live tracks, including tracks re-acquired later.
+  useEffect(() => {
+    micMutedRef.current = micMuted;
+    setTrackEnabled(media.mic, !micMuted);
+  }, [micMuted, media.mic]);
 
-  const setCameraOff = useCallback(
-    (off: boolean) => {
-      if (media.video) media.video.enabled = !off;
-      setCameraOffState(off);
-    },
-    [media.video],
-  );
+  useEffect(() => {
+    setTrackEnabled(media.video, !cameraOff);
+  }, [cameraOff, media.video]);
 
   const setTranslationEnabled = useCallback((enabled: boolean) => {
     translationEnabledRef.current = enabled;
@@ -245,11 +289,6 @@ export function useCall(roomId: string, token: string, session: SessionResponse,
   const resumeAudio = useCallback(() => {
     void audioRef.current?.context.resume();
   }, []);
-
-  // Keep mute state applied when tracks change (e.g. after re-acquiring the microphone).
-  useEffect(() => {
-    if (media.mic) media.mic.enabled = !micMutedRef.current;
-  }, [media.mic]);
 
   return {
     socketStatus,
@@ -271,8 +310,8 @@ export function useCall(roomId: string, token: string, session: SessionResponse,
     micMuted,
     cameraOff,
     translationEnabled,
-    setMicMuted,
-    setCameraOff,
+    setMicMuted: setMicMutedState,
+    setCameraOff: setCameraOffState,
     setTranslationEnabled,
     resumeAudio,
   };

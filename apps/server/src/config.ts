@@ -1,14 +1,12 @@
 import { z } from 'zod';
 
 const bool = z.enum(['true', 'false']).transform((v) => v === 'true');
-const csv = z
-  .string()
-  .transform((v) =>
-    v
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
+const csv = z.string().transform((v) =>
+  v
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
 
 const envSchema = z
   .object({
@@ -45,16 +43,28 @@ const envSchema = z
   })
   .superRefine((env, ctx) => {
     if (env.TURN_URLS.length > 0 && !env.TURN_SECRET) {
-      ctx.addIssue({ code: 'custom', path: ['TURN_SECRET'], message: 'Required when TURN_URLS is set' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TURN_SECRET'],
+        message: 'Required when TURN_URLS is set',
+      });
     }
     if (env.AI_PROVIDER === 'fake' && env.NODE_ENV !== 'test') {
-      ctx.addIssue({ code: 'custom', path: ['AI_PROVIDER'], message: 'The fake provider is only allowed when NODE_ENV=test' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AI_PROVIDER'],
+        message: 'The fake provider is only allowed when NODE_ENV=test',
+      });
     }
     if (env.AI_PROVIDER === 'google' && env.GOOGLE_CREDENTIALS_JSON) {
       try {
         JSON.parse(env.GOOGLE_CREDENTIALS_JSON);
       } catch {
-        ctx.addIssue({ code: 'custom', path: ['GOOGLE_CREDENTIALS_JSON'], message: 'Must be valid JSON' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['GOOGLE_CREDENTIALS_JSON'],
+          message: 'Must be valid JSON',
+        });
       }
     }
   });
@@ -64,7 +74,9 @@ export type Config = z.infer<typeof envSchema>;
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = envSchema.safeParse(env);
   if (!parsed.success) {
-    const details = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
+    const details = parsed.error.issues
+      .map((i) => `  ${i.path.join('.')}: ${i.message}`)
+      .join('\n');
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
   return parsed.data;

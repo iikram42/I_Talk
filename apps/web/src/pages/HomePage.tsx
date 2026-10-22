@@ -8,9 +8,18 @@ import { SiteHeader } from '../components/SiteHeader';
 import { useLanguages } from '../lib/useLanguages';
 
 const STEPS = [
-  { title: 'Create a private room', body: 'Pick voice or video and choose which language each of you speaks and wants to hear.' },
-  { title: 'Share the invitation', body: 'Send the one-time link. Only one guest can join, and you can revoke it at any time.' },
-  { title: 'Talk naturally', body: 'Each person speaks their own language. The other hears a translated voice and sees live captions.' },
+  {
+    title: 'Create a private room',
+    body: 'Pick voice or video and choose which language each of you speaks and wants to hear.',
+  },
+  {
+    title: 'Share the invitation',
+    body: 'Send the one-time link. Only one guest can join, and you can revoke it at any time.',
+  },
+  {
+    title: 'Talk naturally',
+    body: 'Each person speaks their own language. The other hears a translated voice and sees live captions.',
+  },
 ];
 
 function LanguagePreview() {
@@ -26,7 +35,15 @@ function LanguagePreview() {
   }
   if (languages.status === 'error') {
     return (
-      <Notice tone="error" title="Couldn't load languages" action={<Button variant="secondary" onClick={languages.retry}>Retry</Button>}>
+      <Notice
+        tone="error"
+        title="Couldn't load languages"
+        action={
+          <Button variant="secondary" onClick={languages.retry}>
+            Retry
+          </Button>
+        }
+      >
         {languages.message}
       </Notice>
     );
@@ -70,23 +87,33 @@ export function HomePage() {
               Real conversations, even when you don't share a language.
             </h1>
             <p className="mt-5 max-w-xl text-lg text-muted">
-              {APP_NAME} connects two people on a private voice or video call. Each of you speaks naturally, and the
-              other hears a translated voice with live captions.
+              {APP_NAME} connects two people on a private voice or video call. Each of you speaks
+              naturally, and the other hears a translated voice with live captions.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button size="lg" icon={<MicIcon />} onClick={() => navigate('/new?type=voice')}>
                 Start a Voice Call
               </Button>
-              <Button size="lg" variant="secondary" icon={<VideoIcon />} onClick={() => navigate('/new?type=video')}>
+              <Button
+                size="lg"
+                variant="secondary"
+                icon={<VideoIcon />}
+                onClick={() => navigate('/new?type=video')}
+              >
                 Start a Video Call
               </Button>
             </div>
-            <p className="mt-4 text-sm text-muted">No account needed. Works in current Chrome, Edge, Firefox and Safari.</p>
+            <p className="mt-4 text-sm text-muted">
+              No account needed. Works in current Chrome, Edge, Firefox and Safari.
+            </p>
           </div>
 
           <Card className="p-6">
             <h2 className="text-base font-semibold">Languages</h2>
-            <p className="mt-1 mb-5 text-sm text-muted">Speech recognition, translation and voices are checked against the AI provider this server uses.</p>
+            <p className="mt-1 mb-5 text-sm text-muted">
+              Speech recognition, translation and voices are checked against the AI provider this
+              server uses.
+            </p>
             <LanguagePreview />
           </Card>
         </section>
@@ -96,8 +123,13 @@ export function HomePage() {
             <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
             <ol className="mt-8 grid gap-6 md:grid-cols-3">
               {STEPS.map((step, i) => (
-                <li key={step.title} className="rounded-[var(--radius-card)] border border-line p-6">
-                  <span className="flex size-8 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">{i + 1}</span>
+                <li
+                  key={step.title}
+                  className="rounded-[var(--radius-card)] border border-line p-6"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
+                    {i + 1}
+                  </span>
                   <h3 className="mt-4 font-semibold">{step.title}</h3>
                   <p className="mt-1.5 text-sm text-muted">{step.body}</p>
                 </li>
@@ -106,9 +138,9 @@ export function HomePage() {
             <div className="mt-8 flex items-start gap-3 rounded-lg bg-canvas p-4 text-sm text-muted">
               <CaptionsIcon className="mt-0.5 size-5 shrink-0 text-accent" />
               <p>
-                Translation is not instantaneous. Expect a short delay after each sentence while it is recognized,
-                translated and spoken. Quality and delay depend on the languages, background noise, your network
-                and the AI provider.
+                Translation is not instantaneous. Expect a short delay after each sentence while it
+                is recognized, translated and spoken. Quality and delay depend on the languages,
+                background noise, your network and the AI provider.
               </p>
             </div>
           </div>
@@ -122,21 +154,23 @@ export function HomePage() {
               <ul className="mt-5 grid gap-4 text-sm text-muted sm:grid-cols-2">
                 <li>
                   <strong className="block text-ink">Private rooms</strong>
-                  Rooms use unguessable links, allow exactly two people, and the server checks every request.
+                  Rooms use unguessable links, allow exactly two people, and the server checks every
+                  request.
                 </li>
                 <li>
                   <strong className="block text-ink">Encrypted media</strong>
-                  Audio and video travel between you over encrypted WebRTC connections, directly or through a relay.
+                  Audio and video travel between you over encrypted WebRTC connections, directly or
+                  through a relay.
                 </li>
                 <li>
                   <strong className="block text-ink">AI processing</strong>
-                  To translate, your microphone audio is sent through our server to an external AI provider
-                  (Google Cloud). This is not end-to-end encrypted.
+                  To translate, your microphone audio is sent through our server to an external AI
+                  provider (Google Cloud). This is not end-to-end encrypted.
                 </li>
                 <li>
                   <strong className="block text-ink">No recordings</strong>
-                  We do not record or store audio, video, transcripts or translations. Room details are deleted a
-                  few days after a call ends.
+                  We do not record or store audio, video, transcripts or translations. Room details
+                  are deleted a few days after a call ends.
                 </li>
               </ul>
             </div>
@@ -144,7 +178,8 @@ export function HomePage() {
         </section>
       </main>
       <footer className="border-t border-line py-8 text-center text-sm text-muted">
-        {APP_NAME} · Peer-to-peer connections can reveal your network address to the other participant.
+        {APP_NAME} · Peer-to-peer connections can reveal your network address to the other
+        participant.
       </footer>
     </div>
   );

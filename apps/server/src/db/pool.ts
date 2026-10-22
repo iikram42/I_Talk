@@ -8,7 +8,10 @@ export function createPool(connectionString: string): Db {
 }
 
 /** Runs `fn` inside a transaction, rolling back on any error. */
-export async function withTransaction<T>(db: Db, fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+export async function withTransaction<T>(
+  db: Db,
+  fn: (client: pg.PoolClient) => Promise<T>,
+): Promise<T> {
   const client = await db.connect();
   try {
     await client.query('BEGIN');

@@ -39,7 +39,13 @@ export class RoomSocket {
     ws.binaryType = 'arraybuffer';
     this.ws = ws;
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'auth', roomId: this.roomId, token: this.token } satisfies ClientMessage));
+      ws.send(
+        JSON.stringify({
+          type: 'auth',
+          roomId: this.roomId,
+          token: this.token,
+        } satisfies ClientMessage),
+      );
       window.clearInterval(this.pingTimer);
       this.pingTimer = window.setInterval(() => this.send({ type: 'ping' }), 20_000);
     };

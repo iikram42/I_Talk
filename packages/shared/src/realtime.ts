@@ -6,6 +6,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('auth'), roomId: z.string().max(64), token: z.string().max(128) }),
   z.object({
     type: z.literal('signal'),
+    /** Identifies the host's peer connection so stale signals from a replaced one are ignored. */
+    connectionId: z.string().max(64).optional(),
     description: z
       .object({ type: z.enum(['offer', 'answer']), sdp: z.string().max(100_000) })
       .optional(),
@@ -25,6 +27,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     utteranceId: z.string().max(64),
     state: z.enum(['started', 'ended', 'skipped']),
   }),
+  /** The answerer has a fresh peer connection and is ready for an offer. */
+  z.object({ type: z.literal('peer-ready') }),
   z.object({ type: z.literal('ping') }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -43,7 +47,12 @@ export type ServerMessage =
   | { type: 'ready'; selfId: string; room: RoomView; participants: ParticipantView[] }
   | { type: 'room-update'; room: RoomView; participants: ParticipantView[] }
   | { type: 'peer-media-state'; micMuted: boolean; cameraOff: boolean }
-  | { type: 'signal'; description?: { type: 'offer' | 'answer'; sdp: string }; candidate?: RTCIceCandidateLike }
+  | {
+      type: 'signal';
+      connectionId?: string;
+      description?: { type: 'offer' | 'answer'; sdp: string };
+      candidate?: RTCIceCandidateLike;
+    }
   | { type: 'room-ended'; reason: string }
   | {
       type: 'transcript';
@@ -74,6 +83,7 @@ export type ServerMessage =
   | { type: 'peer-playback'; utteranceId: string; state: 'started' | 'ended' | 'skipped' }
   | { type: 'translation-status'; participantId: string; state: TranslationState; message?: string }
   | { type: 'error'; code: string; message: string }
+  | { type: 'peer-ready' }
   | { type: 'pong' };
 
 export interface RTCIceCandidateLike {

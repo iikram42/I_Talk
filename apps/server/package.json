@@ -10,6 +10,7 @@
     "migrate:prod": "node dist/migrate.js",
     "migrate": "tsx --env-file-if-exists=../../.env src/db/migrate-cli.ts",
     "typecheck": "tsc -p tsconfig.json",
+    "live-check": "tsx --env-file-if-exists=../../.env scripts/live-check.ts",
     "test": "vitest run"
   },
   "devDependencies": {

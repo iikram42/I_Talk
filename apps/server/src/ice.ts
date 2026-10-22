@@ -6,7 +6,11 @@ import type { Config } from './config.js';
  * Builds the ICE server list for a participant. TURN credentials use the coturn
  * `use-auth-secret` scheme: short-lived, derived from a shared secret, never stored.
  */
-export function iceServersFor(config: Config, participantId: string, now = Date.now()): IceServerConfig[] {
+export function iceServersFor(
+  config: Config,
+  participantId: string,
+  now = Date.now(),
+): IceServerConfig[] {
   const servers: IceServerConfig[] = [];
   if (config.STUN_URLS.length > 0) servers.push({ urls: config.STUN_URLS });
   if (config.TURN_URLS.length > 0 && config.TURN_SECRET) {

@@ -10,7 +10,7 @@ export type MediaError =
   | { kind: 'unknown'; message: string };
 
 export interface LocalMedia {
-  status: 'idle' | 'requesting' | 'ready' | 'error';
+  status: 'requesting' | 'ready' | 'error';
   stream: MediaStream | null;
   mic: MediaStreamTrack | null;
   video: MediaStreamTrack | null;
@@ -27,7 +27,11 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   autoGainControl: true,
   channelCount: 1,
 };
-const VIDEO_CONSTRAINTS: MediaTrackConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' };
+const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+  facingMode: 'user',
+};
 
 function classify(err: unknown): MediaError {
   const name = err instanceof DOMException ? err.name : '';
@@ -38,9 +42,11 @@ function classify(err: unknown): MediaError {
 }
 
 /** Requests microphone (and camera for video calls) and releases them when the component unmounts. */
-export function useLocalMedia(callType: CallType | null): LocalMedia {
+export function useLocalMedia(callType: CallType): LocalMedia {
+  const supported =
+    typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
   const [state, setState] = useState<Omit<LocalMedia, 'retry'>>({
-    status: 'idle',
+    status: 'requesting',
     stream: null,
     mic: null,
     video: null,
@@ -51,13 +57,8 @@ export function useLocalMedia(callType: CallType | null): LocalMedia {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    if (!callType) return;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setState((s) => ({ ...s, status: 'error', error: { kind: 'unsupported' } }));
-      return;
-    }
+    if (!supported) return;
     let cancelled = false;
-    setState((s) => ({ ...s, status: 'requesting', error: null }));
 
     (async () => {
       let stream: MediaStream;
@@ -82,7 +83,8 @@ export function useLocalMedia(callType: CallType | null): LocalMedia {
       const mic = stream.getAudioTracks()[0] ?? null;
       const video = stream.getVideoTracks()[0] ?? null;
       const onEnded = (device: 'microphone' | 'camera') => () => {
-        if (!cancelled) setState((s) => ({ ...s, status: 'error', error: { kind: 'disconnected', device } }));
+        if (!cancelled)
+          setState((s) => ({ ...s, status: 'error', error: { kind: 'disconnected', device } }));
       };
       mic?.addEventListener('ended', onEnded('microphone'));
       video?.addEventListener('ended', onEnded('camera'));
@@ -96,8 +98,12 @@ export function useLocalMedia(callType: CallType | null): LocalMedia {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [callType, attempt]);
+  }, [callType, attempt, supported]);
 
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const retry = useCallback(() => {
+    setState((s) => ({ ...s, status: 'requesting', error: null }));
+    setAttempt((n) => n + 1);
+  }, []);
+  if (!supported) return { ...state, status: 'error', error: { kind: 'unsupported' }, retry };
   return { ...state, retry };
 }

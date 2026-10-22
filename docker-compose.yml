@@ -1,0 +1,49 @@
+# Local stack: PostgreSQL + the app. `docker compose --profile turn up` also starts a TURN relay.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: parley
+      POSTGRES_USER: parley
+      POSTGRES_PASSWORD: parley
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U parley']
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://parley:parley@db:5432/parley
+      PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-http://localhost:8080}
+    ports:
+      - '8080:8080'
+
+  turn:
+    profiles: [turn]
+    image: coturn/coturn:4.6
+    network_mode: host
+    command:
+      - -n
+      - --log-file=stdout
+      - --listening-port=3478
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET:?set TURN_SECRET}
+      - --realm=${TURN_REALM:-parley.local}
+      - --no-cli
+      - --no-multicast-peers
+      - --denied-peer-ip=10.0.0.0-10.255.255.255
+      - --denied-peer-ip=172.16.0.0-172.31.255.255
+      - --denied-peer-ip=192.168.0.0-192.168.255.255
+
+volumes:
+  pgdata:

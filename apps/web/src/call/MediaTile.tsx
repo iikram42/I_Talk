@@ -47,9 +47,17 @@ export function MediaTile({
       }`}
     >
       {showVideo && stream ? (
-        <video ref={videoRef} autoPlay playsInline muted className={`h-full w-full object-cover ${mirrored ? '-scale-x-100' : ''}`} />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`h-full w-full object-cover ${mirrored ? '-scale-x-100' : ''}`}
+        />
       ) : (
-        <div className={`flex items-center justify-center rounded-full bg-white/10 font-semibold text-white ${compact ? 'size-14 text-lg' : 'size-24 text-3xl'}`}>
+        <div
+          className={`flex items-center justify-center rounded-full bg-white/10 font-semibold text-white ${compact ? 'size-14 text-lg' : 'size-24 text-3xl'}`}
+        >
           {initials(name) || '?'}
         </div>
       )}

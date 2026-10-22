@@ -29,12 +29,20 @@ async function request<T>(path: string, init: RequestInit & { token?: string } =
   try {
     res = await fetch(path, { ...init, headers });
   } catch {
-    throw new ApiError('network', 'Could not reach the server. Check your connection and try again.', 0);
+    throw new ApiError(
+      'network',
+      'Could not reach the server. Check your connection and try again.',
+      0,
+    );
   }
   const body = (await res.json().catch(() => null)) as T | ApiErrorBody | null;
   if (!res.ok) {
     const err = (body as ApiErrorBody | null)?.error;
-    throw new ApiError(err?.code ?? 'internal', err?.message ?? 'Something went wrong.', res.status);
+    throw new ApiError(
+      err?.code ?? 'internal',
+      err?.message ?? 'Something went wrong.',
+      res.status,
+    );
   }
   return body as T;
 }
@@ -56,7 +64,13 @@ export const api = {
   session: (roomId: string, token: string) =>
     request<SessionResponse>(`/api/rooms/${encodeURIComponent(roomId)}/session`, { token }),
   endRoom: (roomId: string, token: string) =>
-    request<{ room: RoomView }>(`/api/rooms/${encodeURIComponent(roomId)}/end`, { method: 'POST', token }),
+    request<{ room: RoomView }>(`/api/rooms/${encodeURIComponent(roomId)}/end`, {
+      method: 'POST',
+      token,
+    }),
   revokeInvite: (roomId: string, token: string) =>
-    request<{ room: RoomView }>(`/api/rooms/${encodeURIComponent(roomId)}/invite/revoke`, { method: 'POST', token }),
+    request<{ room: RoomView }>(`/api/rooms/${encodeURIComponent(roomId)}/invite/revoke`, {
+      method: 'POST',
+      token,
+    }),
 };

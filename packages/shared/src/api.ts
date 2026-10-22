@@ -27,7 +27,12 @@ export const createRoomSchema = z.object({
   guestLanguage: languageCode,
   guestOutputLanguage: languageCode,
   hostName: displayName.optional(),
-  title: z.string().trim().max(80).regex(/^[^<>]*$/).optional(),
+  title: z
+    .string()
+    .trim()
+    .max(80)
+    .regex(/^[^<>]*$/)
+    .optional(),
   expiresInMinutes: z
     .number()
     .int()
@@ -80,7 +85,15 @@ export interface CreateRoomResponse {
 }
 
 export interface InvitePreviewResponse {
-  room: Pick<RoomView, 'id' | 'callType' | 'title' | 'expiresAt' | 'expectedGuestLanguage' | 'expectedGuestOutputLanguage'>;
+  room: Pick<
+    RoomView,
+    | 'id'
+    | 'callType'
+    | 'title'
+    | 'expiresAt'
+    | 'expectedGuestLanguage'
+    | 'expectedGuestOutputLanguage'
+  >;
   host: Pick<ParticipantView, 'displayName' | 'spokenLanguage' | 'outputLanguage'>;
 }
 

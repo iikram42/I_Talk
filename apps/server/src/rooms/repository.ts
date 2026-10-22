@@ -31,7 +31,13 @@ export interface ParticipantRow {
 
 export type NewRoom = Pick<
   RoomRow,
-  'id' | 'call_type' | 'title' | 'invite_token_hash' | 'expected_guest_language' | 'expected_guest_output_language' | 'expires_at'
+  | 'id'
+  | 'call_type'
+  | 'title'
+  | 'invite_token_hash'
+  | 'expected_guest_language'
+  | 'expected_guest_output_language'
+  | 'expires_at'
 >;
 export type NewParticipant = Pick<
   ParticipantRow,
@@ -43,8 +49,15 @@ export async function insertRoom(db: DbClient, room: NewRoom): Promise<RoomRow> 
     `INSERT INTO rooms (id, call_type, title, status, invite_token_hash, expected_guest_language,
                         expected_guest_output_language, expires_at)
      VALUES ($1, $2, $3, 'waiting', $4, $5, $6, $7) RETURNING *`,
-    [room.id, room.call_type, room.title, room.invite_token_hash, room.expected_guest_language,
-      room.expected_guest_output_language, room.expires_at],
+    [
+      room.id,
+      room.call_type,
+      room.title,
+      room.invite_token_hash,
+      room.expected_guest_language,
+      room.expected_guest_output_language,
+      room.expires_at,
+    ],
   );
   return rows[0]!;
 }
@@ -58,7 +71,11 @@ export async function insertParticipant(db: DbClient, p: NewParticipant): Promis
   return rows[0]!;
 }
 
-export async function findRoom(db: DbClient, id: string, forUpdate = false): Promise<RoomRow | undefined> {
+export async function findRoom(
+  db: DbClient,
+  id: string,
+  forUpdate = false,
+): Promise<RoomRow | undefined> {
   const { rows } = await db.query<RoomRow>(
     `SELECT * FROM rooms WHERE id = $1${forUpdate ? ' FOR UPDATE' : ''}`,
     [id],
@@ -106,7 +123,10 @@ export async function setRoomStatus(
 }
 
 export async function revokeInvite(db: DbClient, id: string): Promise<void> {
-  await db.query(`UPDATE rooms SET invite_revoked_at = COALESCE(invite_revoked_at, now()) WHERE id = $1`, [id]);
+  await db.query(
+    `UPDATE rooms SET invite_revoked_at = COALESCE(invite_revoked_at, now()) WHERE id = $1`,
+    [id],
+  );
 }
 
 export async function touchParticipant(db: DbClient, id: string): Promise<void> {
@@ -127,7 +147,11 @@ export async function expireRooms(db: DbClient, maxDurationMinutes: number): Pro
 }
 
 /** Ends active calls where nobody has been seen for `idleMinutes` (both sides gone). */
-export async function abandonRooms(db: DbClient, roomIdsWithPresence: string[], idleMinutes: number): Promise<string[]> {
+export async function abandonRooms(
+  db: DbClient,
+  roomIdsWithPresence: string[],
+  idleMinutes: number,
+): Promise<string[]> {
   const { rows } = await db.query<{ id: string }>(
     `UPDATE rooms r SET status = 'ended', end_reason = 'abandoned', ended_at = now()
       WHERE r.status = 'active'

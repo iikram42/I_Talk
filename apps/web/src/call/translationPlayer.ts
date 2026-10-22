@@ -21,6 +21,8 @@ export class TranslationPlayer {
   private queue: TranslatedClip[] = [];
   private playing: AudioBufferSourceNode | null = null;
   private playingId: string | null = null;
+  /** True while the next clip is being decoded, so a new arrival doesn't start a second one. */
+  private loading = false;
   private disposed = false;
 
   constructor(
@@ -36,15 +38,16 @@ export class TranslationPlayer {
   }
 
   get busy(): boolean {
-    return this.playing !== null;
+    return this.playing !== null || this.loading;
   }
 
   enqueue(clip: TranslatedClip): void {
     if (this.disposed) return;
     this.queue.push(clip);
     // If speech is arriving faster than it can be spoken, skip the oldest waiting clips.
-    while (this.queue.length > MAX_PENDING) this.onPlayback(this.queue.shift()!.utteranceId, 'skipped');
-    if (!this.playing) void this.playNext();
+    while (this.queue.length > MAX_PENDING)
+      this.onPlayback(this.queue.shift()!.utteranceId, 'skipped');
+    if (!this.busy) void this.playNext();
   }
 
   private async playNext(): Promise<void> {
@@ -55,12 +58,15 @@ export class TranslationPlayer {
       return this.playNext();
     }
     let buffer: AudioBuffer;
+    this.loading = true;
     try {
       buffer = await this.context.decodeAudioData(clip.audio.slice(0));
     } catch {
+      this.loading = false;
       this.onPlayback(clip.utteranceId, 'skipped');
       return this.playNext();
     }
+    this.loading = false;
     if (this.disposed) return;
     const source = this.context.createBufferSource();
     source.buffer = buffer;
@@ -69,10 +75,13 @@ export class TranslationPlayer {
     this.playingId = clip.utteranceId;
     source.onended = () => {
       source.disconnect();
-      if (this.playing === source) this.playing = null;
+      if (this.playing === source) {
+        this.playing = null;
+        this.playingId = null;
+      }
       this.onPlayback(clip.utteranceId, 'ended');
       window.setTimeout(() => {
-        if (!this.playing) void this.playNext();
+        if (!this.busy) void this.playNext();
       }, GAP_MS);
     };
     this.onPlayback(clip.utteranceId, 'started');
@@ -89,6 +98,7 @@ export class TranslationPlayer {
       this.playing.disconnect();
       this.playing = null;
       if (this.playingId) this.onPlayback(this.playingId, 'skipped');
+      this.playingId = null;
     }
   }
 

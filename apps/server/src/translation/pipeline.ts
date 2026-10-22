@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { AUDIO_SAMPLE_RATE, findLanguage, type ServerMessage, type TranslationState } from '@parley/shared';
+import {
+  AUDIO_SAMPLE_RATE,
+  findLanguage,
+  type ServerMessage,
+  type TranslationState,
+} from '@parley/shared';
 import type { RecognitionResult, RecognitionStream, SpeechProviders } from './providers.js';
 import type { LoopGuard } from './loopGuard.js';
 import { normalize } from './loopGuard.js';
@@ -115,7 +120,12 @@ export class SpeakerPipeline {
   private setState(state: TranslationState, message?: string) {
     if (state === this.state && !message) return;
     this.state = state;
-    this.opts.broadcast({ type: 'translation-status', participantId: this.speakerId, state, ...(message ? { message } : {}) });
+    this.opts.broadcast({
+      type: 'translation-status',
+      participantId: this.speakerId,
+      state,
+      ...(message ? { message } : {}),
+    });
   }
 
   private open(): StreamHandle {
@@ -145,7 +155,10 @@ export class SpeakerPipeline {
     if (this.current === handle) this.current = null;
     if (this.stopped) return;
     this.consecutiveErrors += 1;
-    this.opts.log.warn({ err: error.message, speakerId: this.speakerId }, 'speech recognition stream error');
+    this.opts.log.warn(
+      { err: error.message, speakerId: this.speakerId },
+      'speech recognition stream error',
+    );
     if (this.consecutiveErrors >= this.timings.maxConsecutiveErrors) {
       this.pausedUntil = this.now() + this.timings.errorCooldownMs;
       this.consecutiveErrors = 0;
@@ -177,7 +190,11 @@ export class SpeakerPipeline {
     const finalAt = this.now();
     const normalized = normalize(text);
     if (!normalized) return;
-    if (this.lastFinal && this.lastFinal.text === normalized && finalAt - this.lastFinal.at < this.timings.duplicateWindowMs) {
+    if (
+      this.lastFinal &&
+      this.lastFinal.text === normalized &&
+      finalAt - this.lastFinal.at < this.timings.duplicateWindowMs
+    ) {
       return;
     }
     this.lastFinal = { text: normalized, at: finalAt };
@@ -192,7 +209,10 @@ export class SpeakerPipeline {
     });
 
     if (this.opts.guard.isEcho(this.speakerId, text)) {
-      this.opts.log.info({ utteranceId, speakerId: this.speakerId }, 'dropped utterance matching recently played translation');
+      this.opts.log.info(
+        { utteranceId, speakerId: this.speakerId },
+        'dropped utterance matching recently played translation',
+      );
       return;
     }
 
@@ -219,7 +239,12 @@ export class SpeakerPipeline {
         from.translationCode === to.translationCode
           ? text
           : await withTimeout('translation', this.timings.translateTimeoutMs, (signal) =>
-              this.opts.providers.translation.translate(text, from.translationCode, to.translationCode, signal),
+              this.opts.providers.translation.translate(
+                text,
+                from.translationCode,
+                to.translationCode,
+                signal,
+              ),
             );
       const translationMs = this.now() - t0;
       this.opts.broadcast({
@@ -263,7 +288,10 @@ export class SpeakerPipeline {
         this.opts.log.warn({ utteranceId, delay }, 'dropped stale translated audio');
         return;
       }
-      this.opts.log.info({ utteranceId, speakerId: this.speakerId, ...latency }, 'utterance translated');
+      this.opts.log.info(
+        { utteranceId, speakerId: this.speakerId, ...latency },
+        'utterance translated',
+      );
       this.opts.sendToSpeaker({
         type: 'translated-audio',
         utteranceId,

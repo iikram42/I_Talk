@@ -41,7 +41,12 @@ export interface SynthesizedAudio {
 }
 
 export interface TextToSpeechProvider {
-  synthesize(text: string, languageCode: string, voiceName: string, signal: AbortSignal): Promise<SynthesizedAudio>;
+  synthesize(
+    text: string,
+    languageCode: string,
+    voiceName: string,
+    signal: AbortSignal,
+  ): Promise<SynthesizedAudio>;
 }
 
 export interface ProviderCapabilities {

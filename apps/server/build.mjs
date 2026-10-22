@@ -1,4 +1,5 @@
 import { cp, readFile, rm } from 'node:fs/promises';
+import { URL } from 'node:url';
 import { build } from 'esbuild';
 
 const pkg = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'));

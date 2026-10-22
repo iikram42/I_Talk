@@ -1,5 +1,14 @@
 import { type ReactNode, useEffect, useState } from 'react';
-import { CaptionsIcon, MicIcon, MicOffIcon, PhoneOffIcon, SpeakerIcon, TranslateIcon, VideoIcon, VideoOffIcon } from '../components/icons';
+import {
+  CaptionsIcon,
+  MicIcon,
+  MicOffIcon,
+  PhoneOffIcon,
+  SpeakerIcon,
+  TranslateIcon,
+  VideoIcon,
+  VideoOffIcon,
+} from '../components/icons';
 import { supportsOutputSelection } from './RemoteAudio';
 
 function ControlButton({
@@ -76,12 +85,19 @@ export function CallControls({
   const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
   useEffect(() => {
     if (!settingsOpen || !supportsOutputSelection()) return;
-    void navigator.mediaDevices.enumerateDevices().then((d) => setOutputs(d.filter((x) => x.kind === 'audiooutput')));
+    void navigator.mediaDevices
+      .enumerateDevices()
+      .then((d) => setOutputs(d.filter((x) => x.kind === 'audiooutput')));
   }, [settingsOpen]);
 
   return (
     <div className="relative flex flex-wrap items-center justify-center gap-3">
-      <ControlButton label={micMuted ? 'Unmute microphone' : 'Mute microphone'} pressed={micMuted} tone={micMuted ? 'off' : 'default'} onClick={onMic}>
+      <ControlButton
+        label={micMuted ? 'Unmute microphone' : 'Mute microphone'}
+        pressed={micMuted}
+        tone={micMuted ? 'off' : 'default'}
+        onClick={onMic}
+      >
         {micMuted ? <MicOffIcon /> : <MicIcon />}
       </ControlButton>
       {isVideo && (
@@ -95,7 +111,11 @@ export function CallControls({
           {cameraOff || !cameraAvailable ? <VideoOffIcon /> : <VideoIcon />}
         </ControlButton>
       )}
-      <ControlButton label={captionsOn ? 'Hide captions' : 'Show captions'} pressed={captionsOn} onClick={onCaptions}>
+      <ControlButton
+        label={captionsOn ? 'Hide captions' : 'Show captions'}
+        pressed={captionsOn}
+        onClick={onCaptions}
+      >
         <CaptionsIcon />
       </ControlButton>
       <ControlButton
@@ -106,7 +126,11 @@ export function CallControls({
       >
         <TranslateIcon />
       </ControlButton>
-      <ControlButton label="Audio settings" pressed={settingsOpen} onClick={() => setSettingsOpen((o) => !o)}>
+      <ControlButton
+        label="Audio settings"
+        pressed={settingsOpen}
+        onClick={() => setSettingsOpen((o) => !o)}
+      >
         <SpeakerIcon />
       </ControlButton>
       <ControlButton label="End call" tone="danger" onClick={onEnd}>
@@ -114,7 +138,11 @@ export function CallControls({
       </ControlButton>
 
       {settingsOpen && (
-        <div role="dialog" aria-label="Audio settings" className="absolute bottom-16 z-30 w-72 rounded-xl bg-white p-4 text-sm text-ink shadow-2xl">
+        <div
+          role="dialog"
+          aria-label="Audio settings"
+          className="absolute bottom-16 z-30 w-72 rounded-xl bg-white p-4 text-sm text-ink shadow-2xl"
+        >
           <label className="block font-medium" htmlFor="original-volume">
             Other person's original voice
           </label>
@@ -153,7 +181,9 @@ export function CallControls({
           ) : (
             <p className="mt-4 text-xs text-muted">This browser uses the system speaker setting.</p>
           )}
-          <p className="mt-4 text-xs text-muted">Tip: headphones give the clearest translations and prevent echo.</p>
+          <p className="mt-4 text-xs text-muted">
+            Tip: headphones give the clearest translations and prevent echo.
+          </p>
         </div>
       )}
     </div>

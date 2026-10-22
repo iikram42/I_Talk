@@ -16,7 +16,11 @@ export function canTransition(from: RoomStatus, to: RoomStatus): boolean {
  * Derives the status a room should have from who has joined and who is connected right now.
  * Once a call has been `active` it stays active while participants reconnect.
  */
-export function nextStatus(current: RoomStatus, guestJoined: boolean, connectedCount: number): RoomStatus {
+export function nextStatus(
+  current: RoomStatus,
+  guestJoined: boolean,
+  connectedCount: number,
+): RoomStatus {
   let status = current;
   if (status === 'waiting' && guestJoined) status = 'connecting';
   if (status === 'connecting' && connectedCount >= 2) status = 'active';

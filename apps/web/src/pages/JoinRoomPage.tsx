@@ -39,11 +39,26 @@ function useInviteToken(roomId: string): string | null {
 }
 
 const INVITE_ERRORS: Record<string, { title: string; body: string }> = {
-  invite_invalid: { title: 'This link isn’t valid', body: 'Check that you copied the whole invitation link, or ask for a new one.' },
-  invite_expired: { title: 'This invitation has expired', body: 'Ask the host to create a new room and send you a fresh link.' },
-  invite_revoked: { title: 'This invitation was revoked', body: 'The host cancelled this link. Ask them for a new one.' },
-  room_full: { title: 'This call is full', body: 'Someone else has already joined. Rooms are limited to two people.' },
-  room_ended: { title: 'This call has ended', body: 'The host ended this call. Ask them for a new link to talk again.' },
+  invite_invalid: {
+    title: 'This link isn’t valid',
+    body: 'Check that you copied the whole invitation link, or ask for a new one.',
+  },
+  invite_expired: {
+    title: 'This invitation has expired',
+    body: 'Ask the host to create a new room and send you a fresh link.',
+  },
+  invite_revoked: {
+    title: 'This invitation was revoked',
+    body: 'The host cancelled this link. Ask them for a new one.',
+  },
+  room_full: {
+    title: 'This call is full',
+    body: 'Someone else has already joined. Rooms are limited to two people.',
+  },
+  room_ended: {
+    title: 'This call has ended',
+    body: 'The host ended this call. Ask them for a new link to talk again.',
+  },
 };
 
 export function JoinRoomPage() {
@@ -87,13 +102,19 @@ export function JoinRoomPage() {
 
   const failure = !inviteToken ? new ApiError('invite_invalid', '', 404) : previewError;
   if (failure) {
-    const copy = INVITE_ERRORS[failure.code] ?? { title: 'Couldn’t open this invitation', body: failure.message };
+    const copy = INVITE_ERRORS[failure.code] ?? {
+      title: 'Couldn’t open this invitation',
+      body: failure.message,
+    };
     return (
       <PageShell>
         <Card className="p-8 text-center">
           <h1 className="text-xl font-semibold">{copy.title}</h1>
           <p className="mt-2 text-sm text-muted">{copy.body}</p>
-          <Link to="/" className="mt-6 inline-block text-sm font-medium text-accent hover:underline">
+          <Link
+            to="/"
+            className="mt-6 inline-block text-sm font-medium text-accent hover:underline"
+          >
             Start your own call
           </Link>
         </Card>
@@ -113,7 +134,15 @@ export function JoinRoomPage() {
   if (languages.status === 'error') {
     return (
       <PageShell>
-        <Notice tone="error" title="Couldn't load languages" action={<Button variant="secondary" onClick={languages.retry}>Retry</Button>}>
+        <Notice
+          tone="error"
+          title="Couldn't load languages"
+          action={
+            <Button variant="secondary" onClick={languages.retry}>
+              Retry
+            </Button>
+          }
+        >
           {languages.message}
         </Notice>
       </PageShell>
@@ -121,7 +150,7 @@ export function JoinRoomPage() {
   }
 
   const spokenValue = spoken ?? preview.room.expectedGuestLanguage;
-  const outputValue = output ?? (spoken ?? preview.room.expectedGuestOutputLanguage);
+  const outputValue = output ?? spoken ?? preview.room.expectedGuestOutputLanguage;
   const isVideo = preview.room.callType === 'video';
 
   async function onSubmit(e: FormEvent) {
@@ -176,23 +205,52 @@ export function JoinRoomPage() {
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-5" noValidate>
         <Field label="Your name" error={nameError}>
-          {(p) => <input {...p} className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoComplete="nickname" autoFocus />}
+          {(p) => (
+            <input
+              {...p}
+              className={inputClass}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={40}
+              autoComplete="nickname"
+              autoFocus
+            />
+          )}
         </Field>
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="I speak">
-            {(p) => <LanguageSelect {...p} value={spokenValue} onChange={setSpoken} options={languages.data.languages} />}
+            {(p) => (
+              <LanguageSelect
+                {...p}
+                value={spokenValue}
+                onChange={setSpoken}
+                options={languages.data.languages}
+              />
+            )}
           </Field>
           <Field label="I want to hear">
-            {(p) => <LanguageSelect {...p} value={outputValue} onChange={setOutput} options={languages.data.languages} />}
+            {(p) => (
+              <LanguageSelect
+                {...p}
+                value={outputValue}
+                onChange={setOutput}
+                options={languages.data.languages}
+              />
+            )}
           </Field>
         </div>
 
         <Notice tone="info" title={isVideo ? 'Camera and microphone' : 'Microphone'}>
-          Your browser will ask for {isVideo ? 'camera and microphone' : 'microphone'} access when you join. To translate
-          what you say, your microphone audio is processed by an external AI provider during the call. Nothing is recorded.
+          Your browser will ask for {isVideo ? 'camera and microphone' : 'microphone'} access when
+          you join. To translate what you say, your microphone audio is processed by an external AI
+          provider during the call. Nothing is recorded.
         </Notice>
 
-        {joinError && <Notice tone="error" title="Couldn't join">{joinError}</Notice>}
+        {joinError && (
+          <Notice tone="error" title="Couldn't join">
+            {joinError}
+          </Notice>
+        )}
         <Button type="submit" size="lg" loading={joining}>
           Join call
         </Button>

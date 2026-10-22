@@ -20,12 +20,20 @@ export function createFakeProviders(utteranceMs = 3_000): SpeechProviders {
             if (closed) return;
             audioMs += (pcm.length / 2 / options.sampleRateHertz) * 1000;
             if (audioMs >= nextAt - utteranceMs / 2 && audioMs < nextAt) {
-              handlers.onResult({ text: `test utterance ${counter + 1}`, isFinal: false, endOffsetMs: audioMs });
+              handlers.onResult({
+                text: `test utterance ${counter + 1}`,
+                isFinal: false,
+                endOffsetMs: audioMs,
+              });
             }
             if (audioMs >= nextAt) {
               counter += 1;
               nextAt += utteranceMs;
-              handlers.onResult({ text: `test utterance ${counter} in ${options.languageCode}`, isFinal: true, endOffsetMs: audioMs });
+              handlers.onResult({
+                text: `test utterance ${counter} in ${options.languageCode}`,
+                isFinal: true,
+                endOffsetMs: audioMs,
+              });
             }
           },
           end() {
@@ -75,7 +83,10 @@ function toneWav(sampleRate = 16_000, seconds = 0.8): Buffer {
   buf.write('data', 36);
   buf.writeUInt32LE(samples * 2, 40);
   for (let i = 0; i < samples; i++) {
-    buf.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 12_000), 44 + i * 2);
+    buf.writeInt16LE(
+      Math.round(Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 12_000),
+      44 + i * 2,
+    );
   }
   return buf;
 }

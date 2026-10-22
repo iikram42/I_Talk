@@ -12,7 +12,6 @@ export function useLanguages(): State & { retry: () => void } {
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    setState({ status: 'loading' });
     api.languages().then(
       (data) => !cancelled && setState({ status: 'ready', data }),
       (err: Error) => !cancelled && setState({ status: 'error', message: err.message }),
@@ -21,5 +20,9 @@ export function useLanguages(): State & { retry: () => void } {
       cancelled = true;
     };
   }, [attempt]);
-  return { ...state, retry: () => setAttempt((n) => n + 1) };
+  const retry = () => {
+    setState({ status: 'loading' });
+    setAttempt((n) => n + 1);
+  };
+  return { ...state, retry };
 }

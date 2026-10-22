@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 8090;
-export const E2E_DATABASE_URL = process.env.E2E_DATABASE_URL ?? 'postgres://postgres@localhost:5432/parley_e2e';
+export const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL ?? 'postgres://postgres@localhost:5432/parley_e2e';
 
 export default defineConfig({
   testDir: 'e2e',

@@ -9,7 +9,11 @@ export function Field({
   label: string;
   hint?: string;
   error?: string;
-  children: (props: { id: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }) => ReactNode;
+  children: (props: {
+    id: string;
+    'aria-describedby'?: string;
+    'aria-invalid'?: boolean;
+  }) => ReactNode;
 }) {
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;

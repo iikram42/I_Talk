@@ -10,7 +10,7 @@ import { useToast } from '../components/ui/Toast';
 import { CallScreen } from '../call/CallScreen';
 import { useCall } from '../call/useCall';
 import { type MediaError, useLocalMedia } from '../call/useLocalMedia';
-import { ApiError, api } from '../lib/api';
+import { type ApiError, api } from '../lib/api';
 import { clearRoomSession, loadRoomSession } from '../lib/session';
 
 const END_COPY: Record<string, string> = {
@@ -26,7 +26,10 @@ function EndedView({ reason }: { reason: string }) {
       <Card className="p-8 text-center">
         <h1 className="text-xl font-semibold">Call ended</h1>
         <p className="mt-2 text-sm text-muted">{END_COPY[reason] ?? END_COPY.ended}</p>
-        <Link to="/" className="mt-6 inline-flex h-10 items-center rounded-lg bg-accent px-4 text-sm font-medium text-white hover:bg-accent-strong">
+        <Link
+          to="/"
+          className="mt-6 inline-flex h-10 items-center rounded-lg bg-accent px-4 text-sm font-medium text-white hover:bg-accent-strong"
+        >
           Start a new call
         </Link>
       </Card>
@@ -34,21 +37,41 @@ function EndedView({ reason }: { reason: string }) {
   );
 }
 
-function MediaErrorView({ error, isVideo, onRetry }: { error: MediaError; isVideo: boolean; onRetry: () => void }) {
+function MediaErrorView({
+  error,
+  isVideo,
+  onRetry,
+}: {
+  error: MediaError;
+  isVideo: boolean;
+  onRetry: () => void;
+}) {
   const device = isVideo ? 'camera and microphone' : 'microphone';
   const copy: Record<MediaError['kind'], { title: string; body: string }> = {
     denied: {
       title: `${isVideo ? 'Camera and microphone' : 'Microphone'} access is blocked`,
       body: `Allow access to your ${device} using the icon in your browser's address bar, then try again.`,
     },
-    'not-found': { title: 'No microphone found', body: 'Connect a microphone or headset, then try again.' },
-    'in-use': { title: 'Your device is busy', body: `Another app may be using your ${device}. Close it and try again.` },
-    unsupported: { title: 'This browser can’t make calls', body: 'Use a recent version of Chrome, Edge, Firefox or Safari over HTTPS.' },
+    'not-found': {
+      title: 'No microphone found',
+      body: 'Connect a microphone or headset, then try again.',
+    },
+    'in-use': {
+      title: 'Your device is busy',
+      body: `Another app may be using your ${device}. Close it and try again.`,
+    },
+    unsupported: {
+      title: 'This browser can’t make calls',
+      body: 'Use a recent version of Chrome, Edge, Firefox or Safari over HTTPS.',
+    },
     disconnected: {
       title: `Your ${error.kind === 'disconnected' ? error.device : 'device'} was disconnected`,
       body: 'Reconnect it, then continue the call.',
     },
-    unknown: { title: 'Couldn’t start your microphone', body: error.kind === 'unknown' ? error.message : '' },
+    unknown: {
+      title: 'Couldn’t start your microphone',
+      body: error.kind === 'unknown' ? error.message : '',
+    },
   };
   const { title, body } = copy[error.kind];
   return (
@@ -58,7 +81,10 @@ function MediaErrorView({ error, isVideo, onRetry }: { error: MediaError; isVide
         <p className="mt-2 text-sm text-muted">{body}</p>
         <div className="mt-6 flex gap-3">
           {error.kind !== 'unsupported' && <Button onClick={onRetry}>Try again</Button>}
-          <Link to="/" className="inline-flex h-10 items-center px-2 text-sm text-muted hover:text-ink">
+          <Link
+            to="/"
+            className="inline-flex h-10 items-center px-2 text-sm text-muted hover:text-ink"
+          >
             Leave
           </Link>
         </div>
@@ -67,7 +93,17 @@ function MediaErrorView({ error, isVideo, onRetry }: { error: MediaError; isVide
   );
 }
 
-function ActiveCall({ roomId, token, inviteToken, session }: { roomId: string; token: string; inviteToken?: string; session: SessionResponse }) {
+function ActiveCall({
+  roomId,
+  token,
+  inviteToken,
+  session,
+}: {
+  roomId: string;
+  token: string;
+  inviteToken?: string;
+  session: SessionResponse;
+}) {
   const toast = useToast();
   const media = useLocalMedia(session.room.callType);
   const call = useCall(roomId, token, session, media);
@@ -91,19 +127,32 @@ function ActiveCall({ roomId, token, inviteToken, session }: { roomId: string; t
   if (call.socketStatus === 'closed' && call.closeCode === 4409) {
     return (
       <PageShell>
-        <Notice tone="warning" title="This call is open in another tab">Close this tab and continue there.</Notice>
+        <Notice tone="warning" title="This call is open in another tab">
+          Close this tab and continue there.
+        </Notice>
       </PageShell>
     );
   }
   if (media.status === 'error' && media.error) {
-    return <MediaErrorView error={media.error} isVideo={session.room.callType === 'video'} onRetry={media.retry} />;
+    return (
+      <MediaErrorView
+        error={media.error}
+        isVideo={session.room.callType === 'video'}
+        onRetry={media.retry}
+      />
+    );
   }
   if (media.status !== 'ready') {
     return (
       <PageShell>
         <CenteredState>
-          <Spinner label={`Waiting for ${session.room.callType === 'video' ? 'camera and microphone' : 'microphone'} permission…`} />
-          <p className="max-w-sm text-sm text-muted">Your browser will ask for access. Your audio is used for the call and for live translation; nothing is recorded.</p>
+          <Spinner
+            label={`Waiting for ${session.room.callType === 'video' ? 'camera and microphone' : 'microphone'} permission…`}
+          />
+          <p className="max-w-sm text-sm text-muted">
+            Your browser will ask for access. Your audio is used for the call and for live
+            translation; nothing is recorded.
+          </p>
         </CenteredState>
       </PageShell>
     );
@@ -136,7 +185,6 @@ export function RoomPage() {
   useEffect(() => {
     if (!stored) return;
     let cancelled = false;
-    setError(null);
     api.session(roomId, stored.participantToken).then(
       (s) => !cancelled && setSession(s),
       (err: ApiError) => !cancelled && setError(err),
@@ -151,8 +199,13 @@ export function RoomPage() {
       <PageShell>
         <Card className="p-8 text-center">
           <h1 className="text-xl font-semibold">You’re not part of this call</h1>
-          <p className="mt-2 text-sm text-muted">Open the invitation link you were sent, or start a new call.</p>
-          <Link to="/" className="mt-6 inline-block text-sm font-medium text-accent hover:underline">
+          <p className="mt-2 text-sm text-muted">
+            Open the invitation link you were sent, or start a new call.
+          </p>
+          <Link
+            to="/"
+            className="mt-6 inline-block text-sm font-medium text-accent hover:underline"
+          >
             Go to the home page
           </Link>
         </Card>
@@ -162,7 +215,21 @@ export function RoomPage() {
   if (error) {
     return (
       <PageShell>
-        <Notice tone="error" title="Couldn't load the call" action={<Button variant="secondary" onClick={() => setAttempt((n) => n + 1)}>Retry</Button>}>
+        <Notice
+          tone="error"
+          title="Couldn't load the call"
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setError(null);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              Retry
+            </Button>
+          }
+        >
           {error.message}
         </Notice>
       </PageShell>
@@ -177,6 +244,14 @@ export function RoomPage() {
       </PageShell>
     );
   }
-  if (session.room.status === 'ended') return <EndedView reason={session.room.endReason ?? 'ended'} />;
-  return <ActiveCall roomId={roomId} token={stored.participantToken} inviteToken={stored.inviteToken} session={session} />;
+  if (session.room.status === 'ended')
+    return <EndedView reason={session.room.endReason ?? 'ended'} />;
+  return (
+    <ActiveCall
+      roomId={roomId}
+      token={stored.participantToken}
+      inviteToken={stored.inviteToken}
+      session={session}
+    />
+  );
 }

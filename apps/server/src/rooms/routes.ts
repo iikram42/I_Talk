@@ -23,7 +23,9 @@ export function registerRoomRoutes(
   deps: { config: Config; rooms: RoomService; translation: TranslationService },
 ): void {
   const { config, rooms, translation } = deps;
-  const createLimit = { rateLimit: { max: config.RATE_LIMIT_CREATE_PER_MIN, timeWindow: '1 minute' } };
+  const createLimit = {
+    rateLimit: { max: config.RATE_LIMIT_CREATE_PER_MIN, timeWindow: '1 minute' },
+  };
   const joinLimit = { rateLimit: { max: config.RATE_LIMIT_JOIN_PER_MIN, timeWindow: '1 minute' } };
 
   app.post('/api/rooms', { config: createLimit }, async (req, reply) => {
@@ -34,7 +36,8 @@ export function registerRoomRoutes(
 
   app.post('/api/rooms/:id/preview', { config: joinLimit }, async (req) => {
     const body = (req.body ?? {}) as { inviteToken?: unknown };
-    if (typeof body.inviteToken !== 'string') throw new AppError('invite_invalid', 'This invitation link is not valid.');
+    if (typeof body.inviteToken !== 'string')
+      throw new AppError('invite_invalid', 'This invitation link is not valid.');
     return rooms.preview(roomIdParam(req), body.inviteToken);
   });
 

@@ -18,13 +18,17 @@ export interface RemoteMedia {
 export type ConnectionQuality = 'good' | 'fair' | 'poor' | 'unknown';
 
 export interface PeerSignal {
+  connectionId?: string;
   description?: { type: 'offer' | 'answer'; sdp: string };
   candidate?: RTCIceCandidateLike;
 }
 
 interface Options {
   iceServers: IceServerConfig[];
-  /** The host always makes offers; the guest only answers. This avoids offer collisions. */
+  /**
+   * The host always makes offers and the guest only answers, which avoids offer collisions.
+   * The host waits for the guest's `peer-ready` before offering (see useCall).
+   */
   isOfferer: boolean;
   callType: CallType;
   local: LocalTracks;
@@ -47,28 +51,36 @@ export class PeerCall {
   private disconnectTimer: number | undefined;
   private closed = false;
   private lastStats: { lost: number; received: number } | null = null;
+  /** The host's id for this connection; the guest echoes the id of the offer it answers. */
+  private readonly id = crypto.randomUUID();
+  private remoteId: string | null = null;
 
   constructor(private readonly opts: Options) {
     this.pc = this.create();
-    if (opts.isOfferer) {
-      this.addOffererTransceivers();
-      void this.makeOffer();
-    }
+    if (opts.isOfferer) this.addOffererTransceivers();
     this.statsTimer = window.setInterval(() => void this.measure(), 2_000);
+  }
+
+  private signal(signal: PeerSignal) {
+    const connectionId = this.opts.isOfferer ? this.id : this.remoteId;
+    this.opts.sendSignal({ ...signal, ...(connectionId ? { connectionId } : {}) });
   }
 
   private create(): RTCPeerConnection {
     const pc = new RTCPeerConnection({ iceServers: this.opts.iceServers });
     pc.onicecandidate = (e) => {
-      if (e.candidate) this.opts.sendSignal({ candidate: e.candidate.toJSON() as RTCIceCandidateLike });
+      if (e.candidate && pc === this.pc)
+        this.signal({ candidate: e.candidate.toJSON() as RTCIceCandidateLike });
     };
     pc.ontrack = (e) => this.onTrack(e);
     pc.onconnectionstatechange = () => {
+      if (pc !== this.pc) return;
       const state = pc.connectionState;
       this.opts.onConnectionState(state);
       window.clearTimeout(this.disconnectTimer);
       if (state === 'failed') void this.restartIce();
-      if (state === 'disconnected') this.disconnectTimer = window.setTimeout(() => void this.restartIce(), 4_000);
+      if (state === 'disconnected')
+        this.disconnectTimer = window.setTimeout(() => void this.restartIce(), 4_000);
     };
     return pc;
   }
@@ -77,9 +89,15 @@ export class PeerCall {
     const { local, callType } = this.opts;
     this.pc.addTransceiver(local.mic, { direction: 'sendrecv', streams: [local.micStream] });
     if (callType === 'video') {
-      this.pc.addTransceiver(local.video ?? 'video', { direction: 'sendrecv', streams: [local.micStream] });
+      this.pc.addTransceiver(local.video ?? 'video', {
+        direction: 'sendrecv',
+        streams: [local.micStream],
+      });
     }
-    this.pc.addTransceiver(local.translation, { direction: 'sendrecv', streams: [local.translationStream] });
+    this.pc.addTransceiver(local.translation, {
+      direction: 'sendrecv',
+      streams: [local.translationStream],
+    });
   }
 
   /** Attaches our tracks to the transceivers the offer created, in the agreed order. */
@@ -87,7 +105,11 @@ export class PeerCall {
     const { local } = this.opts;
     const audio = this.pc.getTransceivers().filter((t) => t.receiver.track.kind === 'audio');
     const video = this.pc.getTransceivers().find((t) => t.receiver.track.kind === 'video');
-    const assign = (t: RTCRtpTransceiver | undefined, track: MediaStreamTrack | null, stream: MediaStream) => {
+    const assign = (
+      t: RTCRtpTransceiver | undefined,
+      track: MediaStreamTrack | null,
+      stream: MediaStream,
+    ) => {
       if (!t || t.currentDirection === 'sendrecv') return;
       t.direction = 'sendrecv';
       void t.sender.replaceTrack(track);
@@ -116,10 +138,15 @@ export class PeerCall {
     try {
       const offer = await this.pc.createOffer({ iceRestart });
       await this.pc.setLocalDescription(offer);
-      this.opts.sendSignal({ description: { type: 'offer', sdp: this.pc.localDescription!.sdp } });
+      this.signal({ description: { type: 'offer', sdp: this.pc.localDescription!.sdp } });
     } catch (err) {
       console.warn('Failed to create offer', err);
     }
+  }
+
+  /** Sends a fresh offer (host only), once the guest has said it is ready for one. */
+  offer(): void {
+    if (this.opts.isOfferer) void this.makeOffer();
   }
 
   private async restartIce() {
@@ -127,8 +154,31 @@ export class PeerCall {
     await this.makeOffer(true);
   }
 
+  /** Guest only: the host replaced its connection, so start over with a fresh one. */
+  private resetConnection() {
+    this.detach(this.pc);
+    this.pc.close();
+    this.pc = this.create();
+    this.pendingCandidates = [];
+    this.lastStats = null;
+    this.remote = { original: new MediaStream(), translation: new MediaStream() };
+    this.opts.onRemoteMedia(this.remote);
+  }
+
+  private detach(pc: RTCPeerConnection) {
+    pc.onicecandidate = null;
+    pc.ontrack = null;
+    pc.onconnectionstatechange = null;
+  }
+
   async handleSignal(signal: PeerSignal): Promise<void> {
     if (this.closed) return;
+    if (signal.description?.type === 'offer' && !this.opts.isOfferer) {
+      if (this.remoteId && signal.connectionId !== this.remoteId) this.resetConnection();
+      this.remoteId = signal.connectionId ?? null;
+    } else if ((signal.connectionId ?? null) !== (this.opts.isOfferer ? this.id : this.remoteId)) {
+      return; // Left over from a replaced connection.
+    }
     try {
       if (signal.description) {
         const { type, sdp } = signal.description;
@@ -137,7 +187,9 @@ export class PeerCall {
           await this.pc.setRemoteDescription({ type, sdp });
           this.attachAnswererTracks();
           await this.pc.setLocalDescription(await this.pc.createAnswer());
-          this.opts.sendSignal({ description: { type: 'answer', sdp: this.pc.localDescription!.sdp } });
+          this.signal({
+            description: { type: 'answer', sdp: this.pc.localDescription!.sdp },
+          });
         } else if (this.pc.signalingState === 'have-local-offer') {
           await this.pc.setRemoteDescription({ type, sdp });
         }
@@ -147,7 +199,9 @@ export class PeerCall {
           candidate: signal.candidate.candidate,
           sdpMid: signal.candidate.sdpMid ?? null,
           sdpMLineIndex: signal.candidate.sdpMLineIndex ?? null,
-          ...(signal.candidate.usernameFragment ? { usernameFragment: signal.candidate.usernameFragment } : {}),
+          ...(signal.candidate.usernameFragment
+            ? { usernameFragment: signal.candidate.usernameFragment }
+            : {}),
         };
         if (this.pc.remoteDescription) await this.pc.addIceCandidate(candidate);
         else this.pendingCandidates.push(candidate);
@@ -174,7 +228,11 @@ export class PeerCall {
     let lost = 0;
     let received = 0;
     stats.forEach((report: RTCStats & Record<string, unknown>) => {
-      if (report.type === 'candidate-pair' && report.nominated && typeof report.currentRoundTripTime === 'number') {
+      if (
+        report.type === 'candidate-pair' &&
+        report.nominated &&
+        typeof report.currentRoundTripTime === 'number'
+      ) {
         rtt = report.currentRoundTripTime;
       }
       if (report.type === 'inbound-rtp') {
@@ -197,9 +255,7 @@ export class PeerCall {
     this.closed = true;
     window.clearInterval(this.statsTimer);
     window.clearTimeout(this.disconnectTimer);
-    this.pc.onicecandidate = null;
-    this.pc.ontrack = null;
-    this.pc.onconnectionstatechange = null;
+    this.detach(this.pc);
     this.pc.close();
   }
 }

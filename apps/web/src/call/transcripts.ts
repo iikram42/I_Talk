@@ -13,7 +13,10 @@ export interface Utterance {
 
 const MAX_UTTERANCES = 100;
 
-type TranscriptMessage = Extract<ServerMessage, { type: 'transcript' | 'translation' | 'translated-audio' }>;
+type TranscriptMessage = Extract<
+  ServerMessage,
+  { type: 'transcript' | 'translation' | 'translated-audio' }
+>;
 
 /** Keeps captions in arrival order, merging partial → final → translation for each utterance. */
 export function transcriptReducer(state: Utterance[], msg: TranscriptMessage): Utterance[] {

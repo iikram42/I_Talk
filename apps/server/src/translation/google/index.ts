@@ -30,7 +30,9 @@ function clientOptions(config: Config): ClientOptions {
   return options;
 }
 
-function durationToMs(d: { seconds?: number | string | Long | null; nanos?: number | null } | null | undefined) {
+function durationToMs(
+  d: { seconds?: number | string | Long | null; nanos?: number | null } | null | undefined,
+) {
   if (!d) return undefined;
   return Number(d.seconds ?? 0) * 1000 + Math.round((d.nanos ?? 0) / 1e6);
 }
@@ -56,23 +58,38 @@ export function createGoogleProviders(config: Config): SpeechProviders {
   return {
     name: 'google',
     stt: {
-      openStream({ languageCode, sampleRateHertz }, handlers: RecognitionHandlers): RecognitionStream {
+      openStream(
+        { languageCode, sampleRateHertz },
+        handlers: RecognitionHandlers,
+      ): RecognitionStream {
         const stream = speech._streamingRecognize();
         let closed = false;
         const pending: Buffer[] = [];
         let configured = false;
 
-        stream.on('data', (response: { results?: Array<{ alternatives?: Array<{ transcript?: string | null }> | null; isFinal?: boolean | null; resultEndOffset?: { seconds?: number | string | Long | null; nanos?: number | null } | null }> | null }) => {
-          for (const result of response.results ?? []) {
-            const text = result.alternatives?.[0]?.transcript ?? '';
-            if (!text.trim()) continue;
-            handlers.onResult({
-              text,
-              isFinal: Boolean(result.isFinal),
-              endOffsetMs: durationToMs(result.resultEndOffset),
-            });
-          }
-        });
+        stream.on(
+          'data',
+          (response: {
+            results?: Array<{
+              alternatives?: Array<{ transcript?: string | null }> | null;
+              isFinal?: boolean | null;
+              resultEndOffset?: {
+                seconds?: number | string | Long | null;
+                nanos?: number | null;
+              } | null;
+            }> | null;
+          }) => {
+            for (const result of response.results ?? []) {
+              const text = result.alternatives?.[0]?.transcript ?? '';
+              if (!text.trim()) continue;
+              handlers.onResult({
+                text,
+                isFinal: Boolean(result.isFinal),
+                endOffsetMs: durationToMs(result.resultEndOffset),
+              });
+            }
+          },
+        );
         stream.on('error', (err: Error) => {
           if (!closed) handlers.onError(err);
         });
@@ -88,7 +105,11 @@ export function createGoogleProviders(config: Config): SpeechProviders {
               recognizer: path,
               streamingConfig: {
                 config: {
-                  explicitDecodingConfig: { encoding: 'LINEAR16', sampleRateHertz, audioChannelCount: 1 },
+                  explicitDecodingConfig: {
+                    encoding: 'LINEAR16',
+                    sampleRateHertz,
+                    audioChannelCount: 1,
+                  },
                   languageCodes: [languageCode],
                   model: config.GOOGLE_STT_MODEL,
                   features: { enableAutomaticPunctuation: true },
@@ -144,7 +165,10 @@ export function createGoogleProviders(config: Config): SpeechProviders {
       },
     },
     async capabilities(): Promise<ProviderCapabilities> {
-      const [[languages], [voices]] = await Promise.all([translate.getLanguages(), tts.listVoices({})]);
+      const [[languages], [voices]] = await Promise.all([
+        translate.getLanguages(),
+        tts.listVoices({}),
+      ]);
       return {
         translationLanguages: new Set(languages.map((l) => l.code)),
         voices: new Set((voices.voices ?? []).map((v) => v.name ?? '').filter(Boolean)),

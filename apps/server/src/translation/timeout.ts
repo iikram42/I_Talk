@@ -5,7 +5,11 @@ export class TimeoutError extends Error {
 }
 
 /** Runs `fn` with an AbortSignal that fires after `ms`; rejects with TimeoutError when it does. */
-export async function withTimeout<T>(label: string, ms: number, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+export async function withTimeout<T>(
+  label: string,
+  ms: number,
+  fn: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
   const controller = new AbortController();
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
