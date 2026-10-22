@@ -4,7 +4,7 @@
     "server": {
       "root": ".",
       "runtime": "container",
-      "entrypoint": "apps/server/Dockerfile.vercel"
+      "entrypoint": "Dockerfile.vercel"
     },
     "web": {
       "root": "apps/web",

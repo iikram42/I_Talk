@@ -236,10 +236,10 @@ SIGTERM (closes sockets and the database pool).
 
 `vercel.json` defines two [services](https://vercel.com/docs/services):
 
-| Service  | Built from                                          | Public paths       |
-| -------- | --------------------------------------------------- | ------------------ |
-| `server` | `apps/server/Dockerfile.vercel` (container runtime) | `/api/*` and `/ws` |
-| `web`    | `apps/web` (Vite static build, SPA fallback)        | everything else    |
+| Service  | Built from                                   | Public paths       |
+| -------- | -------------------------------------------- | ------------------ |
+| `server` | `Dockerfile.vercel` (container runtime)      | `/api/*` and `/ws` |
+| `web`    | `apps/web` (Vite static build, SPA fallback) | everything else    |
 
 The browser calls the API and the WebSocket on its own origin, so neither service calls the
 other server-side and no service bindings are needed. Project environment variables to set:
