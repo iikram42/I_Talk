@@ -1,0 +1,35 @@
+{
+  "name": "parley",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "apps/server",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @parley/server & npm run dev -w @parley/web",
+    "build": "npm run build -w @parley/web && npm run build -w @parley/server",
+    "start": "npm run start -w @parley/server",
+    "migrate": "npm run migrate -w @parley/server",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "1.56.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
+  }
+}
