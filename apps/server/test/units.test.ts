@@ -71,6 +71,20 @@ describe('ice servers', () => {
 describe('config', () => {
   it('validates required and dependent settings', () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
+    const onVercel = loadConfig({
+      DATABASE_URL: 'postgres://x/y',
+      VERCEL: '1',
+      VERCEL_URL: 'i-talk-abc123.vercel.app',
+      VERCEL_PROJECT_PRODUCTION_URL: 'i-talk.vercel.app',
+      PUBLIC_ORIGINS: 'https://talk.example.com',
+    });
+    expect(onVercel.PUBLIC_ORIGINS).toEqual([
+      'https://talk.example.com',
+      'https://i-talk-abc123.vercel.app',
+      'https://i-talk.vercel.app',
+    ]);
+    expect(onVercel.TRUST_PROXY).toBe(true);
+    expect(loadConfig({ DATABASE_URL: 'postgres://x/y' }).TRUST_PROXY).toBe(false);
     expect(() => loadConfig({ DATABASE_URL: 'postgres://x/y', TURN_URLS: 'turn:a' })).toThrow(
       /TURN_SECRET/,
     );

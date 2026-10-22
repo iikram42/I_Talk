@@ -71,8 +71,25 @@ const envSchema = z
 
 export type Config = z.infer<typeof envSchema>;
 
+/**
+ * On Vercel, every deployment has its own hostname, so the deployment's own URLs are trusted as
+ * origins automatically, and the platform's proxy headers are trusted unless configured otherwise.
+ */
+function withPlatformDefaults(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  if (env.VERCEL !== '1') return env;
+  const vercelOrigins = [env.VERCEL_URL, env.VERCEL_BRANCH_URL, env.VERCEL_PROJECT_PRODUCTION_URL]
+    .filter((host): host is string => Boolean(host))
+    .map((host) => `https://${host}`);
+  const configured = env.PUBLIC_ORIGINS ? [env.PUBLIC_ORIGINS] : [];
+  return {
+    ...env,
+    PUBLIC_ORIGINS: [...configured, ...vercelOrigins].join(',') || undefined,
+    TRUST_PROXY: env.TRUST_PROXY ?? 'true',
+  };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = envSchema.safeParse(env);
+  const parsed = envSchema.safeParse(withPlatformDefaults(env));
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)

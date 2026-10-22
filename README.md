@@ -232,6 +232,30 @@ Put it behind an HTTPS reverse proxy (Caddy, nginx, a cloud load balancer) that 
 WebSocket upgrades on `/ws`, and set `TRUST_PROXY=true`. The server shuts down gracefully on
 SIGTERM (closes sockets and the database pool).
 
+### Vercel (multi-service project)
+
+`vercel.json` defines two [services](https://vercel.com/docs/services):
+
+| Service  | Built from                                          | Public paths       |
+| -------- | --------------------------------------------------- | ------------------ |
+| `server` | `apps/server/Dockerfile.vercel` (container runtime) | `/api/*` and `/ws` |
+| `web`    | `apps/web` (Vite static build, SPA fallback)        | everything else    |
+
+The browser calls the API and the WebSocket on its own origin, so neither service calls the
+other server-side and no service bindings are needed. Project environment variables to set:
+
+- `DATABASE_URL`: an external PostgreSQL (for example Neon from the Vercel Marketplace).
+- `PORT=8080`: the port the container listens on (Vercel's default is 80).
+- `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CREDENTIALS_JSON`.
+- `PUBLIC_ORIGINS` only for a custom domain. The deployment's own `*.vercel.app` URLs are
+  trusted automatically (from `VERCEL_URL`, `VERCEL_BRANCH_URL` and
+  `VERCEL_PROJECT_PRODUCTION_URL`), and `TRUST_PROXY` defaults to `true` on Vercel.
+
+Caveats: Vercel runs the container as an autoscaling function, so see _Scaling_ below. A
+WebSocket also closes when the function reaches its maximum duration; the client reconnects
+and resumes the call automatically. Local testing with `vercel dev` needs Docker for the
+`server` service.
+
 ### Scaling
 
 Presence and the translation pipelines live in the server process, so run **one instance**
